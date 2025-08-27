@@ -1,0 +1,2 @@
+# Este proyecto no requiere dependencias externas.
+# Se incluye este archivo para referencia.
