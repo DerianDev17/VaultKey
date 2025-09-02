@@ -132,14 +132,14 @@ class PasswordVaultComplete:
         # Botones de acceso
         button_frame = ctk.CTkFrame(login_frame)
         button_frame.pack(pady=10)
-        
-        login_button = ctk.CTkButton(button_frame, text="🔓 Acceder", command=self.login, 
+
+        login_button = ctk.CTkButton(button_frame, text="🔓 Acceder", command=self.login,
                                      width=150, height=40)
         login_button.pack(side="left", padx=10)
-        
-        sync_login_button = ctk.CTkButton(button_frame, text="☁️ Sincronizar y Acceder", 
-                                         command=self.sync_and_login, width=200, height=40)
-        sync_login_button.pack(side="left", padx=10)
+
+        register_button = ctk.CTkButton(button_frame, text="📝 Registrar",
+                                       command=self.register, width=150, height=40)
+        register_button.pack(side="left", padx=10)
         
         # Configuración de auto-bloqueo
         config_frame = ctk.CTkFrame(login_frame)
@@ -165,13 +165,6 @@ class PasswordVaultComplete:
         self.username_entry.bind("<Return>", lambda event: self.login())
         self.username_entry.focus()
 
-    def authenticate_user(self) -> bool:
-        """Valida las credenciales y registra al usuario si es necesario."""
-        username = self.username_entry.get().strip()
-        password = self.password_entry.get()
-
-        if not username or not password:
-            messagebox.showerror("Error", "Debes ingresar usuario y contraseña")
             return False
 
         db_file = "users.json"
@@ -183,24 +176,7 @@ class PasswordVaultComplete:
 
         db = load_user_db(db_file)
         if username not in db:
-            if messagebox.askyesno("Registro", "Usuario no encontrado. ¿Deseas registrarte?"):
-                try:
-                    create_user(username, password, db_file)
-                    messagebox.showinfo("Registro", "Usuario registrado correctamente.")
-                    self.vault_file = f"{username}_vault.json"
-                    self.master_password = password
-                    self.username = username
-                    return True
-                except ValueError as exc:
-                    messagebox.showerror("Error", f"No se pudo registrar: {exc}")
-                    return False
-            else:
-                messagebox.showwarning("Advertencia", "No se pudo iniciar sesión.")
-                return False
 
-        messagebox.showerror("Error", "Contraseña incorrecta.")
-        return False
-        
     def login(self):
         """Maneja el proceso de inicio de sesión normal"""
         if not self.authenticate_user():
@@ -214,50 +190,7 @@ class PasswordVaultComplete:
             self.setup_main_screen()
         except Exception as e:
             messagebox.showerror("Error", f"Error al acceder a la bóveda: {str(e)}")
-    
-    def sync_and_login(self):
-        """Sincroniza con la nube antes de hacer login"""
-        if not self.authenticate_user():
-            return
-        password = self.master_password
-        
-        # Mostrar diálogo de progreso
-        progress_dialog = ctk.CTkToplevel(self.root)
-        progress_dialog.title("Sincronizando...")
-        progress_dialog.geometry("300x150")
-        progress_dialog.transient(self.root)
-        progress_dialog.grab_set()
-        
-        progress_label = ctk.CTkLabel(progress_dialog, text="Sincronizando con la nube...", 
-                                     font=ctk.CTkFont(size=14))
-        progress_label.pack(pady=30)
-        
-        progress_bar = ctk.CTkProgressBar(progress_dialog, width=250)
-        progress_bar.pack(pady=10)
-        progress_bar.set(0.5)
-        
-        def sync_thread():
-            try:
-                success = self.cloud_sync.sync_vault(self.vault_file)
-                progress_dialog.destroy()
 
-                if success:
-                    messagebox.showinfo("Éxito", "Sincronización completada")
-                else:
-                    messagebox.showwarning("Advertencia", "No se pudo sincronizar, usando versión local")
-
-                self.vault_data, self.vault_key = load_or_create_vault(
-                    self.vault_file, password
-                )
-                self.update_activity()
-                self.setup_main_screen()
-                
-            except Exception as e:
-                progress_dialog.destroy()
-                messagebox.showerror("Error", f"Error durante la sincronización: {str(e)}")
-        
-        threading.Thread(target=sync_thread, daemon=True).start()
-        
     def setup_main_screen(self):
         """Configura la pantalla principal del gestor"""
         # Limpiar ventana
