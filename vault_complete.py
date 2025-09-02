@@ -8,6 +8,7 @@ from vault_core import load_or_create_vault, save_vault
 from password_generator import generate_password, check_password_strength
 from cloud_sync import LocalCloudSync
 from security_audit import SecurityAudit, SecureClipboard
+from password_vault.auth import authenticate, create_user, load_user_db
 
 # Configuración de tema
 ctk.set_appearance_mode("dark")
@@ -19,6 +20,7 @@ class PasswordVaultComplete:
         self.vault_key = None
         self.vault_file = "password_vault_complete.json"
         self.master_password = None
+        self.username = None
         self.cloud_sync = LocalCloudSync("vault_cloud_complete")
         self.security_audit = SecurityAudit()
         self.secure_clipboard = SecureClipboard()
@@ -107,11 +109,25 @@ class PasswordVaultComplete:
         features_label = ctk.CTkLabel(features_frame, text=features_text, 
                                      font=ctk.CTkFont(size=12), justify="left")
         features_label.pack(pady=10)
-        
+
+        # Campo de usuario
+        self.username_entry = ctk.CTkEntry(
+            login_frame,
+            placeholder_text="Nombre de usuario",
+            width=300,
+            height=40,
+        )
+        self.username_entry.pack(pady=10)
+
         # Campo de contraseña
-        self.password_entry = ctk.CTkEntry(login_frame, placeholder_text="Contraseña maestra", 
-                                          show="*", width=300, height=40)
-        self.password_entry.pack(pady=20)
+        self.password_entry = ctk.CTkEntry(
+            login_frame,
+            placeholder_text="Contraseña",
+            show="*",
+            width=300,
+            height=40,
+        )
+        self.password_entry.pack(pady=10)
         
         # Botones de acceso
         button_frame = ctk.CTkFrame(login_frame)
@@ -146,19 +162,54 @@ class PasswordVaultComplete:
         
         # Bind Enter key
         self.password_entry.bind("<Return>", lambda event: self.login())
-        self.password_entry.focus()
+        self.username_entry.bind("<Return>", lambda event: self.login())
+        self.username_entry.focus()
+
+    def authenticate_user(self) -> bool:
+        """Valida las credenciales y registra al usuario si es necesario."""
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get()
+
+        if not username or not password:
+            messagebox.showerror("Error", "Debes ingresar usuario y contraseña")
+            return False
+
+        db_file = "users.json"
+        if authenticate(username, password, db_file):
+            self.vault_file = f"{username}_vault.json"
+            self.master_password = password
+            self.username = username
+            return True
+
+        db = load_user_db(db_file)
+        if username not in db:
+            if messagebox.askyesno("Registro", "Usuario no encontrado. ¿Deseas registrarte?"):
+                try:
+                    create_user(username, password, db_file)
+                    messagebox.showinfo("Registro", "Usuario registrado correctamente.")
+                    self.vault_file = f"{username}_vault.json"
+                    self.master_password = password
+                    self.username = username
+                    return True
+                except ValueError as exc:
+                    messagebox.showerror("Error", f"No se pudo registrar: {exc}")
+                    return False
+            else:
+                messagebox.showwarning("Advertencia", "No se pudo iniciar sesión.")
+                return False
+
+        messagebox.showerror("Error", "Contraseña incorrecta.")
+        return False
         
     def login(self):
         """Maneja el proceso de inicio de sesión normal"""
-        password = self.password_entry.get()
-        
-        if not password:
-            messagebox.showerror("Error", "Por favor ingresa tu contraseña maestra")
+        if not self.authenticate_user():
             return
-            
+
         try:
-            self.vault_data, self.vault_key = load_or_create_vault(self.vault_file, password)
-            self.master_password = password
+            self.vault_data, self.vault_key = load_or_create_vault(
+                self.vault_file, self.master_password
+            )
             self.update_activity()
             self.setup_main_screen()
         except Exception as e:
@@ -166,11 +217,9 @@ class PasswordVaultComplete:
     
     def sync_and_login(self):
         """Sincroniza con la nube antes de hacer login"""
-        password = self.password_entry.get()
-        
-        if not password:
-            messagebox.showerror("Error", "Por favor ingresa tu contraseña maestra")
+        if not self.authenticate_user():
             return
+        password = self.master_password
         
         # Mostrar diálogo de progreso
         progress_dialog = ctk.CTkToplevel(self.root)
@@ -191,14 +240,15 @@ class PasswordVaultComplete:
             try:
                 success = self.cloud_sync.sync_vault(self.vault_file)
                 progress_dialog.destroy()
-                
+
                 if success:
                     messagebox.showinfo("Éxito", "Sincronización completada")
                 else:
                     messagebox.showwarning("Advertencia", "No se pudo sincronizar, usando versión local")
-                
-                self.vault_data, self.vault_key = load_or_create_vault(self.vault_file, password)
-                self.master_password = password
+
+                self.vault_data, self.vault_key = load_or_create_vault(
+                    self.vault_file, password
+                )
                 self.update_activity()
                 self.setup_main_screen()
                 
@@ -745,10 +795,12 @@ class PasswordVaultComplete:
         if self.vault_data is not None:
             if messagebox.askyesno("Sincronizar", "¿Deseas sincronizar tus cambios con la nube antes de salir?"):
                 self.manual_sync()
-        
+
         self.vault_data = None
         self.vault_key = None
         self.master_password = None
+        self.username = None
+        self.vault_file = "password_vault_complete.json"
         self.selected_entry = None
         self.setup_login_screen()
         
