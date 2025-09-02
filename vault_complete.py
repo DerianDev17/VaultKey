@@ -165,29 +165,6 @@ class PasswordVaultComplete:
         self.username_entry.bind("<Return>", lambda event: self.login())
         self.username_entry.focus()
 
-    def validate_credentials(self, username: str, password: str) -> bool:
-        """Valida que los campos de usuario y contraseña cumplan requisitos básicos."""
-        if not username or not password:
-            messagebox.showerror("Error", "Debes ingresar usuario y contraseña")
-            return False
-        if len(username) < 3 or not username.isalnum():
-            messagebox.showerror(
-                "Error", "El usuario debe tener al menos 3 caracteres alfanuméricos"
-            )
-            return False
-        if len(password) < 8:
-            messagebox.showerror(
-                "Error", "La contraseña debe tener al menos 8 caracteres"
-            )
-            return False
-        return True
-
-    def authenticate_user(self) -> bool:
-        """Valida las credenciales del usuario."""
-        username = self.username_entry.get().strip()
-        password = self.password_entry.get()
-
-        if not self.validate_credentials(username, password):
             return False
 
         db_file = "users.json"
@@ -199,11 +176,6 @@ class PasswordVaultComplete:
 
         db = load_user_db(db_file)
         if username not in db:
-            messagebox.showerror("Error", "Usuario no registrado.")
-            return False
-
-        messagebox.showerror("Error", "Contraseña incorrecta.")
-        return False
 
     def login(self):
         """Maneja el proceso de inicio de sesión normal"""
@@ -218,34 +190,6 @@ class PasswordVaultComplete:
             self.setup_main_screen()
         except Exception as e:
             messagebox.showerror("Error", f"Error al acceder a la bóveda: {str(e)}")
-
-    def register(self):
-        """Registra un nuevo usuario y accede a la bóveda."""
-        username = self.username_entry.get().strip()
-        password = self.password_entry.get()
-
-        if not self.validate_credentials(username, password):
-            return
-
-        db_file = "users.json"
-        db = load_user_db(db_file)
-        if username in db:
-            messagebox.showerror("Error", "El usuario ya existe.")
-            return
-
-        try:
-            create_user(username, password, db_file)
-            messagebox.showinfo("Éxito", "Usuario registrado correctamente.")
-            self.vault_file = f"{username}_vault.json"
-            self.master_password = password
-            self.username = username
-            self.vault_data, self.vault_key = load_or_create_vault(
-                self.vault_file, self.master_password
-            )
-            self.update_activity()
-            self.setup_main_screen()
-        except ValueError as exc:
-            messagebox.showerror("Error", f"No se pudo registrar: {exc}")
 
     def setup_main_screen(self):
         """Configura la pantalla principal del gestor"""
